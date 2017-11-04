@@ -8,5 +8,6 @@ with open('accuracy_big') as f:
 	plt.plot(x,y)
 	plt.xlabel("mu")
 	plt.ylabel("Accuracy")
-	plt.title("Prediction Accuracies (concated)")
+#    plt.title("Prediction Accuracies (concated)")
+    plt.title("Prediction Accuracies")
 	plt.show()
