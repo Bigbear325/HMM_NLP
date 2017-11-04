@@ -8,6 +8,7 @@ said VBD
 it PRP
 signed VBD
 a DT
+tentative JJ
 agreement NN
 extending IN
 its PRP$
