@@ -89,13 +89,13 @@ class HMM {
     //private int predict_count; //new add
     
     // transition matrix
-    private Matrix A_tran;
+    private Matrix mle_A;
     
     // emission matrix
-    private Matrix B_emm;
+    private Matrix mle_B;
     
     // prior of pos tags
-    private Matrix pitag;
+    private Matrix mle_pi;
     
     
 	/**
@@ -181,13 +181,13 @@ class HMM {
         B = new Matrix(new double[num_postags][num_words]);
         pi = new Matrix(new double[1][num_postags]);
         
-        A_tran = new Matrix(new double[num_postags][num_postags + 1]);
-        B_emm = new Matrix(new double[num_postags][num_words]);
-        pitag = new Matrix(new double[1][num_postags]);
+        mle_A = new Matrix(new double[num_postags][num_postags + 1]);
+        mle_B = new Matrix(new double[num_postags][num_words]);
+        mle_pi = new Matrix(new double[1][num_postags]);
         
         
         
-//        A_tran = new Matrix(new double[num_postags][num_postags + 1]);
+//        mle_A = new Matrix(new double[num_postags][num_postags + 1]);
         
 	}
 
@@ -208,23 +208,23 @@ class HMM {
                 int cur_word_id = vocabulary.get(getWord.getLemme()).intValue();
                 count_tags[cur_tag_id]++;
                 if(word == 0) {
-                    pitag.set(0, cur_tag_id, pitag.get(0, cur_tag_id)+1);//count initial probability  pi
+                    mle_pi.set(0, cur_tag_id, mle_pi.get(0, cur_tag_id)+1);//count initial probability  pi
                     pi.set(0, cur_tag_id, pi.get(0, cur_tag_id)+1);//count initial probability  pi
                     
                 }
                 else {
-                    A_tran.set(pre_tag_id, cur_tag_id, A_tran.get(pre_tag_id, cur_tag_id) + 1);//count transition prob, [pre+ cur]
+                    mle_A.set(pre_tag_id, cur_tag_id, mle_A.get(pre_tag_id, cur_tag_id) + 1);//count transition prob, [pre+ cur]
                     A.set(pre_tag_id, cur_tag_id, A.get(pre_tag_id, cur_tag_id) + 1);//count transition prob, [pre+ cur]
                 }
                 //emission prob
-                B_emm.set(cur_tag_id, cur_word_id, B_emm.get(cur_tag_id, cur_word_id)+ 1);//emission prob
+                mle_B.set(cur_tag_id, cur_word_id, mle_B.get(cur_tag_id, cur_word_id)+ 1);//emission prob
                 B.set(cur_tag_id, cur_word_id, B.get(cur_tag_id, cur_word_id)+ 1);//emission prob
 
                 pre_tag_id = cur_tag_id;
 
                 if(word == s.length() - 1){
                     //last position of A
-                    A_tran.set(cur_tag_id, num_postags, A_tran.get(cur_tag_id, num_postags) + 1);
+                    mle_A.set(cur_tag_id, num_postags, mle_A.get(cur_tag_id, num_postags) + 1);
                     A.set(cur_tag_id, num_postags, A.get(cur_tag_id, num_postags) + 1);
                     
                 }
@@ -235,7 +235,7 @@ class HMM {
         for(int i = 0; i < num_postags; i++){
             for(int j = 0; j < num_words; j++){
 //                if(B.get(i,j) == 0){
-                B_emm.set(i,j, B_emm.get(i,j) + smoothing_eps);
+                mle_B.set(i,j, mle_B.get(i,j) + smoothing_eps);
                     B.set(i,j, B.get(i,j) + smoothing_eps);
 //                }
             }
@@ -247,7 +247,7 @@ class HMM {
 
         for(int i = 0; i < num_postags; i++){
             
-            pitag.set(0, i, pitag.get(0, i) / pi_scale);   //normalized inital prob
+            mle_pi.set(0, i, mle_pi.get(0, i) / pi_scale);   //normalized inital prob
             pi.set(0, i, pi.get(0, i) / pi_scale);   //normalized inital prob
         }
         
@@ -260,7 +260,7 @@ class HMM {
                 A_scale += A.get(i, j); // i = prov, j = cur
             }
             for(int j = 0; j <= num_postags; j++){
-                A_tran.set(i , j, A_tran.get(i, j) / A_scale);
+                mle_A.set(i , j, mle_A.get(i, j) / A_scale);
                 A.set(i , j, A.get(i, j) / A_scale);
             }
 
@@ -269,7 +269,7 @@ class HMM {
                 B_scale += B.get(i,j);    //from tag i to words
             }
             for(int j = 0; j < num_words; j++){
-                B_emm.set(i, j, B_emm.get(i, j) / B_scale);
+                mle_B.set(i, j, mle_B.get(i, j) / B_scale);
                 B.set(i, j, B.get(i, j) / B_scale);
             }
         }
@@ -390,37 +390,37 @@ class HMM {
     private double expection(Sentence s) {
         double PO = forward(s);
         backward(s);
-        
+
         for(int t = 0; t < s.length(); t++){
             //alphaTi * betaTj
             int lemme_id = vocabulary.get(s.getWordAt(t).getLemme()).intValue();
             int word_id = vocabulary.get(s.getWordAt(t).getLemme()).intValue();
-            
+
             for(int tag_id = 0; tag_id < num_postags; ++tag_id){
-                
+
                 double alphaTi = alpha.get(tag_id, t);
                 double betaTj = beta.get(tag_id, t);
                 double gamma_w2 = alphaTi * betaTj;
-                
+
                 gamma_w.set(tag_id, lemme_id, gamma_w.get(tag_id, lemme_id) + gamma_w2);
                 if(t == 0){
                     gamma_0.set(0, tag_id, gamma_0.get(0, tag_id) + gamma_w2);
                 }
             }
-            
+
             for(int tag_id = 0; tag_id < num_postags; ++tag_id){
                 if(t < s.length() - 1) {
                     //alphaTi * alphaTj * betaTj_2 * betaTj_1
-                    
+
                     int post_lemme_id = vocabulary.get(s.getWordAt(t + 1).getLemme()).intValue();
                     for (int post_tag_id = 0; post_tag_id < num_postags; ++post_tag_id) {
-                        
+
                         double alphaTi = alpha.get(tag_id, t);
                         double betaTj_1 = beta.get(post_tag_id, t + 1);
-                        
+
                         double alphaTj = A.get(tag_id, post_tag_id);
                         double betaTj_2 = B.get(post_tag_id, post_lemme_id);
-                        
+
                         double new_gamma_w2 = alphaTi * alphaTj * betaTj_2 * betaTj_1;
                         //digamma set
                         digamma.set(tag_id, post_tag_id, digamma.get(tag_id, post_tag_id) + new_gamma_w2);
@@ -437,21 +437,21 @@ class HMM {
                 }
             }
         }
-        
+
         return PO;
     }
 
 
-	/**
-	 * Maximization step of the EM (Baum-Welch) algorithm.
-	 * Just reestimate A, B and pi using gamma and digamma
-	 */
+    /**
+     * Maximization step of the EM (Baum-Welch) algorithm.
+     * Just reestimate A, B and pi using gamma and digamma
+     */
 
     private void maximization() {
         double scale = 0;
-        
+
         for(int i = 0; i < num_postags; ++i){
-            
+
             scale = smoothing_eps * (num_postags + 1);
             for(int j = 0; j < num_postags + 1; ++j){
                 scale += digamma.get(i, j);
@@ -460,9 +460,9 @@ class HMM {
                 A.set(i, j, (digamma.get(i, j) + smoothing_eps )/ scale);
                 digamma.set(i, j, 0);
             }
-            
+
             scale = smoothing_eps * num_words;
-            
+
             for(int j = 0; j < num_words; ++j){
                 scale += gamma_w.get(i, j);
             }
@@ -471,7 +471,7 @@ class HMM {
                 gamma_w.set(i, j, 0);
             }
         }
-        
+
         scale = 0;
         for(int i = 0; i < num_postags; ++i){
             scale += gamma_0.get(0, i);
@@ -480,7 +480,7 @@ class HMM {
             pi.set(0, i, gamma_0.get(0, i) / scale);
             gamma_0.set(0, i, 0);
         }
-        
+
         //updateLambda?
         //        alpha = new Matrix(new double[num_postags][max_sentence_length]);
         //        beta = new Matrix(new double[num_postags][max_sentence_length]);
@@ -490,38 +490,38 @@ class HMM {
         //        gamma = new Matrix(new double[1][num_postags]);
         //        gamma_0 = new Matrix(new double[1][num_postags]);
         //        gamma_w = new Matrix(new double[num_postags][num_words]);
-        
-        
+
+
         for(int i = 0; i < num_postags; ++i){
             for(int j = 0; j < num_postags + 1; ++j) {
-                A.set(i, j, mu * A_tran.get(i, j) + (1-mu) * A.get(i, j));
+                A.set(i, j, mu * mle_A.get(i, j) + (1-mu) * A.get(i, j));
             }
         }
-        
+
         for(int i = 0; i < num_postags; ++i){
             for(int j = 0; j < num_words; ++j) {
-                B.set(i, j, mu * B_emm.get(i, j) + (1-mu) * B.get(i, j));
+                B.set(i, j, mu * mle_B.get(i, j) + (1-mu) * B.get(i, j));
             }
         }
-        
+
         for(int tag_id = 0; tag_id < num_postags; ++tag_id) {
-            pi.set(0, tag_id, mu * pitag.get(0, tag_id) + (1-mu) * pi.get(0, tag_id));
+            pi.set(0, tag_id, mu * mle_pi.get(0, tag_id) + (1-mu) * pi.get(0, tag_id));
         }
     }
-    
-	/**
-	 * Forward algorithm for one sentence
-	 * s: the sentence
-	 * alpha: forward probability matrix of shape (num_postags, max_sentence_length)
 
-	 * return: log P(O|\lambda)
-	 */
+    /**
+     * Forward algorithm for one sentence
+     * s: the sentence
+     * alpha: forward probability matrix of shape (num_postags, max_sentence_length)
+
+     * return: log P(O|\lambda)
+     */
 
     private double forward(Sentence s) {
         double index = 0;
-        for(int word_order_in_s = 0; word_order_in_s < s.length(); ++word_order_in_s){
+        for(int word_order_in_s = 0; word_order_in_s < s.length(); word_order_in_s++){
             int word_id = vocabulary.get(s.getWordAt(word_order_in_s).getLemme()).intValue();
-            for(int tag_id = 0; tag_id < num_postags; ++tag_id){
+            for(int tag_id = 0; tag_id < num_postags; tag_id++){
                 if(word_order_in_s == 0){
                     alpha.set(tag_id, word_order_in_s, pi.get(0, tag_id) * B.get(tag_id, word_id));
                 }
@@ -534,18 +534,22 @@ class HMM {
                 }
             }
             double scalesum = 0;
-            for(int tag_id = 0; tag_id < num_postags; ++tag_id){
+            for(int tag_id = 0; tag_id < num_postags; tag_id++){
                 scalesum += alpha.get(tag_id, word_order_in_s);
             }
 
-            scales.set(0, word_order_in_s, scalesum);
-            for(int tag_id = 0; tag_id < num_postags; ++tag_id){
-                alpha.set(tag_id, word_order_in_s, alpha.get(tag_id, word_order_in_s) / scales.get(0, word_order_in_s));
+            scales.set(0, word_order_in_s, 1/ scalesum);
+            for(int tag_id = 0; tag_id < num_postags; tag_id++){
+//                alpha.set(tag_id, word_order_in_s, alpha.get(tag_id, word_order_in_s) / scales.get(0, word_order_in_s));
+                
+                
+                //should not be postive number
+                alpha.set(tag_id, word_order_in_s, alpha.get(tag_id, word_order_in_s) * scales.get(0, word_order_in_s));
             }
         }
 
 
-        for(int i = 0; i < s.length(); ++i)
+        for(int i = 0; i < s.length(); i++)
             index += Math.log(1 / scales.get(0, i));
         return index;
     }
@@ -585,10 +589,16 @@ class HMM {
             for(int tag_id = 0; tag_id < num_postags; tag_id++){
                 scale += beta.get(tag_id, word_order_in_s);
             }
-            scales.set(1, word_order_in_s, scale);
+//            scales.set(1, word_order_in_s,  scale);
+//            for(int tag_id = 0; tag_id < num_postags; tag_id++){
+//                beta.set(tag_id, word_order_in_s, beta.get(tag_id,word_order_in_s) / scales.get(1,word_order_in_s));
+//            }
+            
+            scales.set(1, word_order_in_s,  1/ scale);
             for(int tag_id = 0; tag_id < num_postags; tag_id++){
-                beta.set(tag_id, word_order_in_s, beta.get(tag_id,word_order_in_s) / scales.get(1,word_order_in_s));
+                beta.set(tag_id, word_order_in_s, beta.get(tag_id,word_order_in_s) * scales.get(1,word_order_in_s));
             }
+
         }
 
         for(int i = 0; i < s.length(); i++){
@@ -597,12 +607,12 @@ class HMM {
         return index;
     }
 
-    
-	/**
-	 * Viterbi algorithm for one sentence
-	 * v are in log scale, A, B and pi are in the usual scale.
-	 */
-    
+
+    /**
+     * Viterbi algorithm for one sentence
+     * v are in log scale, A, B and pi are in the usual scale.
+     */
+
     //v = max vi-1  * vij * bj(ot)
     private double viterbi(Sentence s) {
         for(int word_order_in_s = 0; word_order_in_s < s.length(); word_order_in_s++){
@@ -641,6 +651,8 @@ class HMM {
 
 
     
+
+    
     
     public static void main(String[] args) throws IOException {
         if (args.length < 3) {
@@ -659,11 +671,13 @@ class HMM {
         }
         
         double mu = 0.8;
+//        float mu = 0.8;
         
         if (args.length > 4) {
             mu = Double.parseDouble(args[4]);
-            predictionFileName += "_" + args[4] + ".txt";
-            trainingLogFileName += "_" + args[4] + ".txt";
+//            mu = Float.parseFloat(args[4]);
+//            predictionFileName += "_" + args[4] + ".txt";
+//            trainingLogFileName += "_" + args[4] + ".txt";
         }
         // read in labeled corpus
         FileHandler fh = new FileHandler();
@@ -680,10 +694,13 @@ class HMM {
         
         model.em();
         model.predict();
-        model.outputPredictions(predictionFileName);
+//        model.outputPredictions(predictionFileName);
+        model.outputPredictions("results/p2/prediction" + "_" + String.format("%.1f", mu) + ".txt");
+        
         
         if (trainingLogFileName != null) {
-            model.outputTrainingLog(trainingLogFileName);
+//            model.outputTrainingLog(trainingLogFileName);
+            model.outputTrainingLog(trainingLogFileName + "_" + String.format("%.1f", mu) + ".txt");
         }
     }
 }
